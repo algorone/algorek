@@ -70,10 +70,6 @@
                         </executions>
                         <configuration>
                             <mainClass>state.Server</mainClass>
-                            <buildArgs>
-                                <buildArg>-Djava.net.preferIPv4Stack=true</buildArg>
-                                <buildArg>--initialize-at-run-time=java.net.InetAddress,java.net.Inet4Address,java.net.Inet6Address,java.net.ServerSocket,java.net.NetworkInterface</buildArg>
-                            </buildArgs>
                         </configuration>
                     </plugin>
                 </plugins>
