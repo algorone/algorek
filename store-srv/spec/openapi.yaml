@@ -1,0 +1,205 @@
+openapi: 3.0.1
+info:
+  title: Object-Store API
+  version: 1.2.3
+  description: |
+    Wewnętrzny serwis składowania plików (store-srv) platformy AlgorOne. 
+    Obsługuje składowanie binarne, kolekcje załączników powiązane z guid oraz procesowanie plików EML.
+tags:
+  - name: base
+    description: Podstawowe operacje na obiektach binarnych
+  - name: attachments
+    description: Zarządzanie załącznikami (kolekcje plików dla danego GUID)
+  - name: eml
+    description: Obsługa i konwersja wiadomości pocztowych
+  - name: system
+    description: Operacje systemowe
+
+paths:
+  /:
+    get:
+      tags: [system]
+      summary: Sprawdzenie statusu usługi
+      responses:
+        200:
+          description: Serwis dostępny
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: "UP" }
+
+  /{guid}:
+    get:
+      tags: [base]
+      summary: Pobiera obiekt, konkretny element lub listę plików
+      parameters:
+        - name: guid
+          in: path
+          required: true
+          schema: { type: string }
+        - name: list
+          in: query
+          description: Jeśli true, zwraca listę nazw plików w formacie JSON
+          schema: { type: boolean }
+        - name: item
+          in: query
+          description: Indeks (integer) konkretnego pliku z paczki
+          schema: { type: integer }
+      responses:
+        200:
+          description: Zawartość pliku lub lista nazw
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+    put:
+      tags: [base]
+      summary: Zapisuje lub aktualizuje obiekt
+      parameters:
+        - name: guid
+          in: path
+          required: true
+          schema: { type: string }
+        - name: name
+          in: query
+          description: Nazwa pliku pod jaką zasób ma być składowany
+          schema: { type: string }
+      requestBody:
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        201: { description: Zasób utworzony }
+        204: { description: Zasób zaktualizowany }
+    delete:
+      tags: [base]
+      summary: Usuwa całą zawartość powiązaną z GUID
+      parameters:
+        - name: guid
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        204: { description: Zawartość usunięta }
+
+  /attachments/{guid}:
+    get:
+      tags: [attachments]
+      summary: Pobiera załączniki, lista - (w przypdaku podania obecnosci ?list), cały zip (bez paramtrów) lub konkretny element - (podanie item=nr pliku z listy)
+      parameters:
+        - name: guid
+          in: path
+          required: true
+          schema: { type: string }
+        - name: list
+          in: query
+          schema: { type: boolean }
+        - name: item
+          in: query
+          description: Indeks załącznika (odpowiednik nr w lru-api)
+          schema: { type: integer }
+      responses:
+        200: { description: Dane załącznika lub lista }
+    post:
+      tags: [attachments]
+      summary: Dodaje nowy załącznik do kolekcji GUID
+      parameters:
+        - name: guid
+          in: path
+          required: true
+          schema: { type: string }
+        - name: name
+          in: query
+          required: true
+          description: Nazwa pliku (parametr nazwa z lru-api)
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        201: { description: Dodano załącznik }
+    delete:
+      tags: [attachments]
+      summary: Usuwa konkretny załącznik wg indeksu
+      parameters:
+        - name: guid
+          in: path
+          required: true
+          schema: { type: string }
+        - name: item
+          in: query
+          required: true
+          description: Numer porządkowy załącznika na liście (integer)
+          schema: { type: integer }
+      responses:
+        204: { description: Załącznik usunięty }
+
+  /eml/{guid}:
+    get:
+      tags: [eml]
+      summary: Pobiera wiadomość EML lub jej części składowe
+      parameters:
+        - name: guid
+          in: path
+          required: true
+          schema: { type: string }
+        - name: preview
+          in: query
+          description: Jeśli true, zwraca treść maila (body) w formacie HTML
+          schema: { type: boolean }
+        - name: list
+          in: query
+          description: Jeśli true, zwraca listę nazw załączników wewnątrz EML
+          schema: { type: boolean }
+        - name: item
+          in: query
+          description: Pobiera konkretny załącznik z maila wg indeksu
+          schema: { type: integer }
+      responses:
+        200:
+          description: Surowy EML, podgląd HTML lub załącznik
+          content:
+            message/rfc822:
+              schema: { type: string, format: binary }
+            text/html:
+              schema: { type: string }
+            application/octet-stream:
+              schema: { type: string, format: binary }
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+    post:
+      tags: [eml]
+      summary: Składuje nową wiadomość EML
+      parameters:
+        - name: guid
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          message/rfc822:
+            schema: { type: string, format: binary }
+      responses:
+        201: { description: EML zapisany }
+    delete:
+      tags: [eml]
+      summary: Usuwa plik EML
+      parameters:
+        - name: guid
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        204: { description: EML usunięty }
+
+
