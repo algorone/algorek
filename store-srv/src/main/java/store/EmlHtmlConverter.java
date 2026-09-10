@@ -47,30 +47,24 @@ public class EmlHtmlConverter {
             Session session = Session.getDefaultInstance(new Properties());
             MimeMessage message = new MimeMessage(session, is);
 
-            // 1. Pobieranie nagłówków z obsługą wartości null
             String subject = message.getSubject() != null ? message.getSubject() : "(Brak tematu)";
             String from = "(Nieznany nadawca)";
             if (message.getFrom() != null && message.getFrom().length > 0) {
-                // Rzutujemy tablicę Address[] na InternetAddress[] i używamy toUnicodeString
                 from = jakarta.mail.internet.InternetAddress.toUnicodeString(message.getFrom());
             }
 
             String to = "(Brak odbiorców)";
             jakarta.mail.Address[] recipientsTo = message.getRecipients(Message.RecipientType.TO);
             if (recipientsTo != null && recipientsTo.length > 0) {
-                // To konwertuje wszystkich odbiorców i rozdziela ich przecinkami, poprawnie
-                // dekodując UTF-8
                 to = jakarta.mail.internet.InternetAddress.toUnicodeString(recipientsTo);
             }
 
-            // 2. Formatowanie daty wysłania
             String sentDateStr = "(Brak daty)";
             if (message.getSentDate() != null) {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
                 sentDateStr = sdf.format(message.getSentDate());
             }
 
-            // 3. Pobieranie listy załączników
             List<String> attachmentsList = new ArrayList<>();
             findAttachments(message, attachmentsList);
 
@@ -80,11 +74,9 @@ public class EmlHtmlConverter {
                 return null;
             }
 
-            // 2. Mapuj Content-ID (CID) na dane w formacie Base64
             Map<String, String> cidToBase64Map = new HashMap<>();
             findAndConvertImages(message, cidToBase64Map);
 
-            // 3. Podmień odnośniki cid: w kodzie HTML za pomocą Jsoup
             Document doc = Jsoup.parse(rawHtml);
             Elements images = doc.select("img[src^=cid:]");
 
@@ -93,7 +85,6 @@ public class EmlHtmlConverter {
                 String cid = src.substring(4).trim();
 
                 if (cidToBase64Map.containsKey(cid)) {
-                    // Podmiana atrybutu src na "data:image/...;base64,..."
                     img.attr("src", cidToBase64Map.get(cid));
                 }
             }
@@ -110,7 +101,6 @@ public class EmlHtmlConverter {
                 attachmentsHtml.append("</ul></div>");
             }
 
-            // 8. Przygotowanie całego panelu nagłówka
             String headerDivHtml = """
                     <div style="font-family: Arial, sans-serif; background-color: #f4f5f7; border: 1px solid #e1e4e8; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
                         <h2 style="margin-top: 0; margin-bottom: 10px; color: #24292e; font-size: 18px;">%s</h2>
@@ -125,7 +115,6 @@ public class EmlHtmlConverter {
                     .formatted(escapeHtml(subject), escapeHtml(from), escapeHtml(to), sentDateStr,
                             attachmentsHtml.toString());
 
-            // 9. Wstrzyknięcie panelu na początek <body>
             Element body = doc.body();
             if (body != null) {
                 body.prepend(headerDivHtml);
@@ -138,7 +127,6 @@ public class EmlHtmlConverter {
         }
     }
 
-    // Rekurencyjna metoda szukająca tekstu HTML
     private static String getHtmlText(Part part) throws Exception {
         if (part.isMimeType("text/html")) {
             return part.getContent().toString();
