@@ -16,10 +16,14 @@
  */
 package state;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashSet;
@@ -30,6 +34,7 @@ import java.util.concurrent.Flow.Subscription;
 import java.util.concurrent.SubmissionPublisher;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -38,7 +43,6 @@ public class Server {
 
     private static Logger logger = Logger.getLogger(Server.class.getName());
 
-
     public static int HTTP_PORT = 8025;
     public static Path DATA_DIR = Path.of("/data/algorone/var/state-srv");
 
@@ -46,6 +50,7 @@ public class Server {
 
     public static void main(String[] args) throws Exception {
         loadenv();
+        leagal();
         flow = new SubmissionPublisher<>();
         var server = HttpServer.create(new InetSocketAddress(HTTP_PORT), 0);
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
@@ -73,7 +78,7 @@ public class Server {
                 }
 
             } catch (Exception e) {
-                logger.log(Level.SEVERE,info,e);
+                logger.log(Level.SEVERE, info, e);
                 var body = (e.getMessage()).getBytes();
                 exchange.sendResponseHeaders(500, body.length);
                 try (var os = exchange.getResponseBody()) {
@@ -86,7 +91,7 @@ public class Server {
         System.err.println("Listen on :" + HTTP_PORT + " data dir: " + DATA_DIR.toAbsolutePath());
     }
 
-    private static void news(HttpExchange exchange) throws IOException{
+    private static void news(HttpExchange exchange) throws IOException {
         var responseHeaders = exchange.getResponseHeaders();
         responseHeaders.add("Content-Type", "text/event-stream");
         responseHeaders.add("Connection", "keep-alive");
@@ -98,47 +103,52 @@ public class Server {
         OutputStream writer = exchange.getResponseBody();
         flow.subscribe(new Subscriber<String>() {
             Subscription subscription;
+
             @Override
             public void onComplete() {
                 try {
                     writer.close();
                 } catch (IOException e) {
-                    logger.log(Level.WARNING,"onComplete",e);
+                    logger.log(Level.WARNING, "onComplete", e);
 
                 }
             }
+
             @Override
-            public void onError(Throwable throwable) { }
+            public void onError(Throwable throwable) {
+            }
+
             @Override
-            public void onNext(String msg) {  
+            public void onNext(String msg) {
                 try {
                     writer.write(msg.getBytes("utf-8"));
                     writer.flush();
                     subscription.request(1);
                 } catch (IOException e) {
-                    logger.log(Level.WARNING,"onNext",e);
-                }  
+                    logger.log(Level.WARNING, "onNext", e);
+                }
             }
+
             @Override
-            public void onSubscribe(Subscription subscription) {  
-                this.subscription=subscription;
-                subscription.request(1);   
+            public void onSubscribe(Subscription subscription) {
+                this.subscription = subscription;
+                subscription.request(1);
                 try {
                     writer.write("SUBSCRIBED\n\n".getBytes("utf-8"));
-                    writer.flush();     
+                    writer.flush();
                 } catch (IOException e) {
-                    logger.log(Level.SEVERE,"onSubscribe",e);
+                    logger.log(Level.SEVERE, "onSubscribe", e);
                 }
-                
+
             }
         });
     }
 
     private static void post(HttpExchange exchange) throws IOException {
         var path = exchange.getRequestURI().getRawPath();
-        try (var reader = new Scanner(exchange.getRequestBody());){
+        try (var reader = new Scanner(exchange.getRequestBody());) {
             while (reader.hasNextLine()) {
-                notify("INFO", path+":"+reader.nextLine());
+                notify("INFO", path + ":" + reader.nextLine());
             }
         }
         ok(exchange, "ok");
@@ -192,9 +202,9 @@ public class Server {
 
     private static void notify(String event, String msg) {
         try {
-            flow.submit("event:"+event+"\ndata:"+msg+"\n\n");
+            flow.submit("event:" + event + "\ndata:" + msg + "\n\n");
         } catch (Exception e) {
-            logger.log(Level.SEVERE,"msg: "+ msg ,e);
+            logger.log(Level.SEVERE, "msg: " + msg, e);
         }
 
     }
@@ -252,5 +262,57 @@ public class Server {
         if (dataDir != null)
             DATA_DIR = Path.of(dataDir);
 
+    }
+
+    public static boolean LICENSE_AGREED_SKIP_DISPLAY = false;
+    public static boolean NOTICE_AGREED_SKIP_DISPLAY = false;
+
+    public static void leagal() {
+        var lic_agreed = System.getenv("LICENSE_AGREED_SKIP_DISPLAY");
+        if (lic_agreed != null)
+            LICENSE_AGREED_SKIP_DISPLAY = Boolean.parseBoolean(lic_agreed);
+        var notice_agreed = System.getenv("NOTICE_AGREED_SKIP_DISPLAY");
+        if (notice_agreed != null)
+            NOTICE_AGREED_SKIP_DISPLAY = Boolean.parseBoolean(notice_agreed);
+
+        if (!LICENSE_AGREED_SKIP_DISPLAY) {
+            System.out.println("LICENSE:");
+            System.out.println(readLicense());
+        }
+        if (!NOTICE_AGREED_SKIP_DISPLAY) {
+            System.out.println("NOTICE:");
+            System.out.println(readNotice());
+        }
+
+    }
+
+    public static String readLicense() {
+        try (InputStream is = Server.class.getClassLoader().getResourceAsStream("META-INF/LICENSE")) {
+            if (is == null) {
+                System.exit(1);
+                return "Nie znaleziono pliku LICENSE.";
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                return reader.lines().collect(Collectors.joining("\n"));
+            }
+        } catch (Exception e) {
+            System.exit(1);
+            return "Błąd podczas odczytu LICENSE: " + e.getMessage();
+        }
+    }
+
+    public static String readNotice() {
+        try (InputStream is = Server.class.getClassLoader().getResourceAsStream("META-INF/NOTICE")) {
+            if (is == null) {
+                System.exit(1);
+                return "Nie znaleziono pliku NOTICE.";
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                return reader.lines().collect(Collectors.joining("\n"));
+            }
+        } catch (Exception e) {
+            System.exit(1);
+            return "Błąd podczas odczytu NOTICE: " + e.getMessage();
+        }
     }
 }
