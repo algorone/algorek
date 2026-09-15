@@ -24,14 +24,19 @@ import java.util.Base64;
 import pl.com.algor.dss.SignatureDocumentForm;
 import pl.com.algor.dss.SigningService;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 public class Server {
     public static int HTTP_PORT = 8024;
@@ -42,6 +47,7 @@ public class Server {
     public static void main( String[] args ) 
     {
         loadenv();
+        leagal();
         HttpServer server;
         try {
             server = HttpServer.create(new InetSocketAddress(HTTP_PORT), 0);
@@ -115,6 +121,58 @@ public class Server {
         var objectStoreUrl  = System.getenv("OBJECT_STORE_URL");
         if (objectStoreUrl !=null)
             OBJECT_STORE_URL = objectStoreUrl;    
+    }
+
+    public static boolean LICENSE_AGREED_SKIP_DISPLAY = false;
+    public static boolean NOTICE_AGREED_SKIP_DISPLAY = false;
+
+    public static void leagal() {
+        var lic_agreed = System.getenv("LICENSE_AGREED_SKIP_DISPLAY");
+        if (lic_agreed != null)
+            LICENSE_AGREED_SKIP_DISPLAY = Boolean.parseBoolean(lic_agreed);
+        var notice_agreed = System.getenv("NOTICE_AGREED_SKIP_DISPLAY");
+        if (notice_agreed != null)
+            NOTICE_AGREED_SKIP_DISPLAY = Boolean.parseBoolean(notice_agreed);
+    
+        if (!LICENSE_AGREED_SKIP_DISPLAY) {
+            System.out.println("LICENSE:");
+            System.out.println(readLicense());
+        }
+        if (!NOTICE_AGREED_SKIP_DISPLAY) {
+            System.out.println("NOTICE:");
+            System.out.println(readNotice());
+        }
+
+    }
+
+    public static String readLicense() {
+        try (InputStream is = Server.class.getClassLoader().getResourceAsStream("META-INF/LICENSE")) {
+            if (is == null) {
+                System.exit(1);
+                return "Nie znaleziono pliku LICENSE.";
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                return reader.lines().collect(Collectors.joining("\n"));
+            }
+        } catch (Exception e) {
+            System.exit(1);
+            return "Błąd podczas odczytu LICENSE: " + e.getMessage();
+        }
+    }
+
+    public static String readNotice() {
+        try (InputStream is = Server.class.getClassLoader().getResourceAsStream("META-INF/NOTICE")) {
+            if (is == null) {
+                System.exit(1);
+                return "Nie znaleziono pliku NOTICE.";
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                return reader.lines().collect(Collectors.joining("\n"));
+            }
+        } catch (Exception e) {
+            System.exit(1);
+            return "Błąd podczas odczytu NOTICE: " + e.getMessage();
+        }
     }
 
 }

@@ -19,12 +19,17 @@ package bus;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 public class Server {
 
@@ -36,8 +41,8 @@ public class Server {
 
     public static void main(String[] args) throws IOException {
         loadenv();
+        leagal();
         engine = new Engine(PUBS, SUBS, DATA_DIR);
-
         var server = HttpServer.create(new InetSocketAddress(HTTP_PORT), 0);
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.createContext("/").setHandler(exchange -> {
@@ -62,29 +67,28 @@ public class Server {
 
         });
         server.start();
-        System.err.println("Listen on :" + HTTP_PORT + " data dir: " + DATA_DIR.toAbsolutePath() + " PUBS:  " + PUBS + " SUBS: "+ SUBS );
+        System.err.println("Listen on :" + HTTP_PORT + " data dir: " + DATA_DIR.toAbsolutePath() + " PUBS:  " + PUBS
+                + " SUBS: " + SUBS);
     }
 
     private static void put(HttpExchange exchange) throws IOException {
         var path = exchange.getRequestURI().getPath().replaceAll("/", "");
         var headers = exchange.getRequestHeaders();
-        String  val = headers.get("Content-length").get(0);
+        String val = headers.get("Content-length").get(0);
         int length = Integer.parseInt(val);
         int busNo = Integer.parseInt(path);
         engine.put(busNo, exchange.getRequestBody(), length);
         ok(exchange, "ok");
     }
 
-
-
     private static int get(HttpExchange exchange) throws IOException {
         var path = exchange.getRequestURI().getPath().split("/");
         var subNo = Integer.parseInt(path[2]);
         var busNo = Integer.parseInt(path[1]);
         var next = engine.nextHeader(subNo, busNo);
-        if(next == null)
+        if (next == null)
             return ok(exchange, "No more data");
-        var position = next.getLong();   
+        var position = next.getLong();
         var timestamp = next.getLong();
         var length = next.getLong();
         exchange.with("timestamp", List.of(new Date(timestamp).toString()));
@@ -92,7 +96,7 @@ public class Server {
         engine.writeTo(exchange.getResponseBody(), busNo, subNo, position + 16, length);
         exchange.close();
         return 200;
-         
+
     }
 
     private static int ok(HttpExchange exchange, String msg) throws IOException {
@@ -117,6 +121,58 @@ public class Server {
         var pubs = System.getenv("BUS_PUBS");
         if (pubs != null)
             PUBS = Integer.parseInt(pubs);
+    }
+
+    public static boolean LICENSE_AGREED_SKIP_DISPLAY = false;
+    public static boolean NOTICE_AGREED_SKIP_DISPLAY = false;
+
+    public static void leagal() {
+        var lic_agreed = System.getenv("LICENSE_AGREED_SKIP_DISPLAY");
+        if (lic_agreed != null)
+            LICENSE_AGREED_SKIP_DISPLAY = Boolean.parseBoolean(lic_agreed);
+        var notice_agreed = System.getenv("NOTICE_AGREED_SKIP_DISPLAY");
+        if (notice_agreed != null)
+            NOTICE_AGREED_SKIP_DISPLAY = Boolean.parseBoolean(notice_agreed);
+    
+        if (!LICENSE_AGREED_SKIP_DISPLAY) {
+            System.out.println("LICENSE:");
+            System.out.println(readLicense());
+        }
+        if (!NOTICE_AGREED_SKIP_DISPLAY) {
+            System.out.println("NOTICE:");
+            System.out.println(readNotice());
+        }
+
+    }
+
+    public static String readLicense() {
+        try (InputStream is = Server.class.getClassLoader().getResourceAsStream("META-INF/LICENSE")) {
+            if (is == null) {
+                System.exit(1);
+                return "Nie znaleziono pliku LICENSE.";
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                return reader.lines().collect(Collectors.joining("\n"));
+            }
+        } catch (Exception e) {
+            System.exit(1);
+            return "Błąd podczas odczytu LICENSE: " + e.getMessage();
+        }
+    }
+
+    public static String readNotice() {
+        try (InputStream is = Server.class.getClassLoader().getResourceAsStream("META-INF/NOTICE")) {
+            if (is == null) {
+                System.exit(1);
+                return "Nie znaleziono pliku NOTICE.";
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                return reader.lines().collect(Collectors.joining("\n"));
+            }
+        } catch (Exception e) {
+            System.exit(1);
+            return "Błąd podczas odczytu NOTICE: " + e.getMessage();
+        }
     }
 
 }
