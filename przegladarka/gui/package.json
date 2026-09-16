@@ -1,10 +1,12 @@
 {
-  "name": "gui",
-  "version": "0.1.0",
+  "name": "przedladarka-dokumentow",
+  "version": "1.0.0",
   "private": true,
+  "license": "GPL-3.0-or-later",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run prebuild && next build",
+    "prebuild": "npx --yes license-checker-rseidelsohn --production --relativeModulePath --relativeLicensePath --excludePrivatePackages > NOTICE.txt",
     "start": "next start",
     "lint": "next lint"
   },

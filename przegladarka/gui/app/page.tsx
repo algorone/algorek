@@ -79,7 +79,7 @@ async function MainInfo() {
             <br />Instancja: {process.env.WLASCICIEL}
             <br />Opiekun robota: {process.env.OPIEKUN}
             <br />Licencja: {process.env.LICENCJA} <a style={{"textDecoration": "Underline"}} href={process.env.LICENCJA_LINK} target="licencja"> link </a>
-
+            <br />To oprogramowanie zawiera komponenty stron trzecich dystrybuowane na osobnych licencjach – szczegóły znajdziesz w <a style={{"textDecoration": "Underline"}} href='/NOTICE' target="licencja"> NOTICE </a>
           </td>
         </tr>
        
